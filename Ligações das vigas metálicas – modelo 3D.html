@@ -1,0 +1,380 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Ligações das vigas metálicas – modelo 3D</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Condensed:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#E6EAED; --scene-bg:#E6EAED; --ink:#1E2A33; --muted:#5A6873;
+  --panel:rgba(250,251,252,.92); --line:#C3CBD1; --btn:#FFFFFF; --btn-on:#24384A; --btn-on-ink:#F4F7F9;
+  --c-concreto:#B9B5AD; --c-perfil:#5F7A8C; --c-chapa:#8E3B26; --c-barra:#3B3F44; --c-solda:#E0A800; --c-arm:#B5651D;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#1B2228; --scene-bg:#1B2228; --ink:#E3E8EC; --muted:#9AA7B1;
+    --panel:rgba(30,38,45,.92); --line:#3A4752; --btn:#26313A; --btn-on:#C9D6E0; --btn-on-ink:#1B2228;
+    --c-concreto:#8F8B84; --c-perfil:#8FA9BB; --c-chapa:#C0583A; --c-barra:#B8BEC4; --c-solda:#F2C230; --c-arm:#D98A3E;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#1B2228; --scene-bg:#1B2228; --ink:#E3E8EC; --muted:#9AA7B1;
+  --panel:rgba(30,38,45,.92); --line:#3A4752; --btn:#26313A; --btn-on:#C9D6E0; --btn-on-ink:#1B2228;
+  --c-concreto:#8F8B84; --c-perfil:#8FA9BB; --c-chapa:#C0583A; --c-barra:#B8BEC4; --c-solda:#F2C230; --c-arm:#D98A3E;
+  color-scheme: dark;
+}
+:root{ box-sizing:border-box; padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px); }
+html{ scroll-padding-top:env(safe-area-inset-top,0px); }
+*,*::before,*::after{ box-sizing:inherit; }
+html,body{ height:100%; margin:0; }
+body{ background:var(--bg); color:var(--ink); font-family:"IBM Plex Sans Condensed","Arial Narrow",Arial,sans-serif; overflow:hidden; }
+#stage{ position:fixed; inset:0; }
+#stage canvas{ display:block; }
+.panel{
+  position:fixed; left:12px; top:calc(12px + env(safe-area-inset-top,0px));
+  width:min(320px, calc(100vw - 24px)); background:var(--panel); border:1px solid var(--line);
+  border-radius:10px; padding:14px 14px 12px; backdrop-filter:blur(6px); z-index:5;
+}
+h1{ font-size:1.15rem; font-weight:600; margin:0 0 2px; letter-spacing:.005em; line-height:1.25; }
+.sub{ font-size:.82rem; color:var(--muted); margin:0 0 12px; line-height:1.35; }
+.views{ display:flex; flex-wrap:wrap; gap:6px; margin-bottom:12px; }
+.views button{
+  font:inherit; font-size:.9rem; font-weight:500; padding:6px 10px; border-radius:6px;
+  border:1px solid var(--line); background:var(--btn); color:var(--ink); cursor:pointer;
+}
+.views button[aria-pressed="true"]{ background:var(--btn-on); color:var(--btn-on-ink); border-color:var(--btn-on); }
+.views button:focus-visible, .toggles input:focus-visible{ outline:2px solid var(--c-solda); outline-offset:2px; }
+.toggles{ display:grid; gap:6px; font-size:.88rem; margin-bottom:10px; }
+.toggles label{ display:flex; align-items:center; gap:8px; cursor:pointer; }
+.info{ font-size:.84rem; line-height:1.4; border-top:1px solid var(--line); padding-top:10px; min-height:3.2em; }
+.info strong{ font-weight:600; }
+.legend{
+  position:fixed; right:12px; bottom:calc(12px + env(safe-area-inset-bottom,0px)); z-index:5;
+  background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:10px 12px;
+  display:grid; grid-template-columns:auto auto; gap:4px 14px; font-size:.82rem;
+}
+.legend span{ display:flex; align-items:center; gap:6px; }
+.legend i{ width:12px; height:12px; border-radius:2px; display:inline-block; }
+.lbl{
+  font-family:"IBM Plex Sans Condensed","Arial Narrow",Arial,sans-serif; font-size:13px; font-weight:600;
+  color:var(--ink); background:var(--panel); border:1px solid var(--line); padding:2px 6px; border-radius:4px;
+  white-space:nowrap; pointer-events:none;
+}
+.lbl.warn{ border-color:var(--c-chapa); color:var(--c-chapa); }
+.lbl.small{ font-weight:500; font-size:12px; }
+.hint{ font-size:.78rem; color:var(--muted); margin-top:8px; }
+#toggle-panel{ display:none; }
+@media (max-width:640px){
+  .panel{ top:auto; bottom:calc(12px + env(safe-area-inset-bottom,0px)); max-height:52vh; overflow:auto; }
+  .legend{ top:calc(12px + env(safe-area-inset-top,0px)); bottom:auto; right:12px; grid-template-columns:auto; }
+  .panel.min .collapsible{ display:none; }
+  #toggle-panel{ display:inline-block; float:right; font:inherit; font-size:.8rem; border:1px solid var(--line); background:var(--btn); color:var(--ink); border-radius:6px; padding:2px 8px; }
+}
+@media (prefers-reduced-motion: reduce){ *{ transition:none!important; } }
+</style>
+</head>
+<body>
+<div id="stage"></div>
+
+<div class="panel" id="panel">
+  <button id="toggle-panel" type="button" aria-expanded="true">Ocultar</button>
+  <h1>Ligações das vigas metálicas</h1>
+  <p class="sub">Piso Social, retirada do P75. Esquema para conferência; as medidas de obra prevalecem.</p>
+  <div class="collapsible">
+    <div class="views" role="group" aria-label="Vistas">
+      <button type="button" data-view="visao-geral">Visão geral</button>
+      <button type="button" data-view="p76">P76</button>
+      <button type="button" data-view="p72">P72</button>
+      <button type="button" data-view="p80">P80</button>
+      <button type="button" data-view="pnovo">PNOVO</button>
+      <button type="button" data-view="p77">P77</button>
+      <button type="button" data-view="viga-viga">Nós viga–viga</button>
+    </div>
+    <div class="toggles">
+      <label><input type="checkbox" id="t-transp" checked> Concreto translúcido</label>
+      <label><input type="checkbox" id="t-arm" checked> Mostrar armadura dos pilares</label>
+      <label><input type="checkbox" id="t-lbl" checked> Mostrar nomes</label>
+    </div>
+    <div class="info" id="info" aria-live="polite"></div>
+    <p class="hint">Arraste para girar, use a roda ou o gesto de pinça para aproximar e o botão direito ou dois dedos para deslocar.</p>
+  </div>
+</div>
+
+<div class="legend" aria-label="Legenda">
+  <span><i style="background:var(--c-concreto)"></i>Concreto</span>
+  <span><i style="background:var(--c-perfil)"></i>Perfis W</span>
+  <span><i style="background:var(--c-chapa)"></i>Chapas e aletas</span>
+  <span><i style="background:var(--c-barra)"></i>Barras roscadas</span>
+  <span><i style="background:var(--c-solda)"></i>Soldas</span>
+  <span><i style="background:var(--c-arm)"></i>Armadura</span>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/renderers/CSS2DRenderer.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/utils/BufferGeometryUtils.js"></script>
+<script>
+(function(){
+const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+
+// ---------- cena ----------
+const stage = document.getElementById('stage');
+const renderer = new THREE.WebGLRenderer({antialias:true});
+renderer.setPixelRatio(Math.min(window.devicePixelRatio,2));
+stage.appendChild(renderer.domElement);
+const labelR = new THREE.CSS2DRenderer();
+labelR.domElement.style.position='absolute'; labelR.domElement.style.top='0'; labelR.domElement.style.pointerEvents='none';
+stage.appendChild(labelR.domElement);
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(40,1,0.01,200);
+const controls = new THREE.OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+scene.add(new THREE.HemisphereLight(0xffffff,0x667788,0.85));
+const sun = new THREE.DirectionalLight(0xffffff,0.75); sun.position.set(4,8,6); scene.add(sun);
+const sun2 = new THREE.DirectionalLight(0xffffff,0.3); sun2.position.set(-5,3,-4); scene.add(sun2);
+
+// planta (x,y) e cota z -> three (x, z, -y)
+const V = (x,y,z)=> new THREE.Vector3(x,z,-y);
+
+const M = {};
+function makeMaterials(){
+  const mk = (c,o={}) => new THREE.MeshStandardMaterial(Object.assign({color:new THREE.Color(css(c)),roughness:.7,metalness:.15},o));
+  M.concreto = mk('--c-concreto',{roughness:.95,metalness:0,transparent:true,opacity:.32,depthWrite:false});
+  M.perfil = mk('--c-perfil',{metalness:.45,roughness:.5});
+  M.chapa = mk('--c-chapa',{metalness:.3,roughness:.6});
+  M.barra = mk('--c-barra',{metalness:.6,roughness:.4});
+  M.solda = mk('--c-solda',{emissive:new THREE.Color(css('--c-solda')),emissiveIntensity:.35});
+  M.arm = mk('--c-arm',{metalness:.3,roughness:.6});
+  M.fantasma = new THREE.MeshBasicMaterial({color:new THREE.Color(css('--c-chapa')),transparent:true,opacity:.12,depthWrite:false});
+  M.seta = new THREE.MeshBasicMaterial({color:new THREE.Color(css('--c-chapa'))});
+}
+makeMaterials();
+
+const groups = { concreto:new THREE.Group(), arm:new THREE.Group(), aco:new THREE.Group(), lbl:new THREE.Group() };
+Object.values(groups).forEach(g=>scene.add(g));
+
+// caixa orientada pela direção em planta (u), com dimensões ao longo de u, de n (perpendicular) e altura
+function box(cx,cy,cz, lu,ln,h, theta, mat, grp){
+  const m = new THREE.Mesh(new THREE.BoxGeometry(lu,h,ln), mat);
+  m.position.copy(V(cx,cy,cz)); m.rotation.y = theta; (grp||groups.aco).add(m); return m;
+}
+function boxGeom(cx,cy,cz, lu,ln,h, theta){
+  const g = new THREE.BoxGeometry(lu,h,ln);
+  const mtx = new THREE.Matrix4().makeRotationY(theta); mtx.setPosition(V(cx,cy,cz)); g.applyMatrix4(mtx); return g;
+}
+function cyl(p0,p1,r,seg,mat,grp){ // cilindro entre dois pontos (vetores three)
+  const d = new THREE.Vector3().subVectors(p1,p0); const len=d.length();
+  const m = new THREE.Mesh(new THREE.CylinderGeometry(r,r,len,seg), mat);
+  m.position.copy(p0).addScaledVector(d,.5);
+  m.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0), d.normalize());
+  (grp||groups.aco).add(m); return m;
+}
+function label(text,x,y,z,cls){
+  const el=document.createElement('div'); el.className='lbl '+(cls||''); el.textContent=text;
+  const o=new THREE.CSS2DObject(el); o.position.copy(V(x,y,z)); groups.lbl.add(o); return o;
+}
+
+// ---------- perfis (Gerdau, tabela USP) ----------
+const W = {
+  'W360x32,9':{d:.349,bf:.127,tw:.0058,tf:.0085},
+  'W360x57,8':{d:.358,bf:.172,tw:.0079,tf:.0131},
+  'W310x28,3':{d:.309,bf:.102,tw:.0060,tf:.0089}
+};
+// viga entre S e E (planta), topo em z=0; recortes {s:{top,bot,len}, e:{...}}
+function beam(S,E,p,cut){
+  cut = cut||{};
+  const dx=E[0]-S[0], dy=E[1]-S[1], L=Math.hypot(dx,dy), ux=dx/L, uy=dy/L, th=Math.atan2(uy,ux);
+  const at = s => [S[0]+ux*s, S[1]+uy*s];
+  const cs = cut.s||{len:0,top:0,bot:0}, ce = cut.e||{len:0,top:0,bot:0};
+  // mesas
+  const fa=cs.len, fb=L-ce.len, fm=at((fa+fb)/2);
+  box(fm[0],fm[1],-p.tf/2, fb-fa,p.bf,p.tf, th, M.perfil);
+  box(fm[0],fm[1],-p.d+p.tf/2, fb-fa,p.bf,p.tf, th, M.perfil);
+  // alma corrente
+  const wm=at((fa+fb)/2); box(wm[0],wm[1],-p.d/2, fb-fa,p.tw,p.d-2*p.tf, th, M.perfil);
+  // alma nas zonas recortadas
+  [[0,cs],[L-ce.len,ce]].forEach(([s0,c])=>{
+    if(!c.len) return;
+    const top = c.top? c.top : p.tf, bot = c.bot? p.d-c.bot : p.d-p.tf;
+    const m=at(s0+c.len/2); box(m[0],m[1],-(top+bot)/2, c.len,p.tw,bot-top, th, M.perfil);
+  });
+  return {ux,uy,th,L};
+}
+
+// ---------- pilares ----------
+const pil = {};
+function pilar(nome,cx,cy,ax,ay,z0,z1,opts){
+  opts=opts||{};
+  const h=z1-z0; box(cx,cy,(z0+z1)/2, ax,ay,h, 0, M.concreto, groups.concreto);
+  // armadura: 4 d12,5 nos cantos, 2 d10 no meio das faces maiores, estribo d6,3 c/12, grampo
+  const geoms=[]; const cov=.04+.0063;
+  const longX = ax>ay;
+  const cxs=[-ax/2+cov+.00625, ax/2-cov-.00625], cys=[-ay/2+cov+.00625, ay/2-cov-.00625];
+  cxs.forEach(x=>cys.forEach(y=>geoms.push(boxGeom(cx+x,cy+y,(z0+z1)/2,.0125,.0125,h,0))));
+  const mids = longX ? [[0,-ay/2+cov+.005],[0,ay/2-cov-.005]] : [[-ax/2+cov+.005,0],[ax/2-cov-.005,0]];
+  mids.forEach(([x,y])=>geoms.push(boxGeom(cx+x,cy+y,(z0+z1)/2,.01,.01,h,0)));
+  const sx=ax-2*.04, sy=ay-2*.04;
+  for(let z=z1-0.0; z>z0+.05; z-=.12){
+    if(z>0.12) continue;
+    geoms.push(boxGeom(cx,cy-sy/2,z,sx,.0063,.0063,0)); geoms.push(boxGeom(cx,cy+sy/2,z,sx,.0063,.0063,0));
+    geoms.push(boxGeom(cx-sx/2,cy,z,.0063,sy,.0063,0)); geoms.push(boxGeom(cx+sx/2,cy,z,.0063,sy,.0063,0));
+    if(longX) geoms.push(boxGeom(cx,cy,z,.0063,sy,.0063,0)); else geoms.push(boxGeom(cx,cy,z,sx,.0063,.0063,0));
+  }
+  const merged = THREE.BufferGeometryUtils.mergeBufferGeometries(geoms);
+  groups.arm.add(new THREE.Mesh(merged, M.arm));
+  pil[nome]={cx,cy,ax,ay};
+  label(nome,cx,cy,z1+.12);
+}
+
+// ---------- ligação-tipo na face do pilar ----------
+// F: ponto da face onde chega o eixo da viga; u: direção viga->pilar; prof: dimensão do pilar ao longo de u
+// p: perfil; rods: cotas (m, abaixo do topo) das barras usadas
+function ligacao(F,u,prof,p,rods){
+  const n=[-u[1],u[0]], th=Math.atan2(u[1],u[0]);
+  const P=(a,b,c)=>[F[0]+u[0]*a+n[0]*b, F[1]+u[1]*a+n[1]*b, c];
+  const latPl=-.0151, latAl=.0109, latRod=-.0301;
+  // chapa e contra-chapa (topo em z=0)
+  let c=P(-.008,latPl,-.24); box(c[0],c[1],c[2], .016,.18,.48, th, M.chapa);
+  c=P(prof+.008,latPl,-.24); box(c[0],c[1],c[2], .016,.18,.48, th, M.chapa);
+  // aleta 16 x 220 x 100, centrada na alma
+  const zc=-(.0445+.11); // aleta padrão: topo a 44,5 mm do topo da chapa
+  c=P(-.016-.05,latAl,zc); box(c[0],c[1],c[2], .10,.016,.22, th, M.chapa);
+  // solda de fábrica aleta-chapa (2 lados)
+  [latAl-.012, latAl+.012].forEach(b=>{ c=P(-.016-.004,b,zc); box(c[0],c[1],c[2], .008,.008,.22, th, M.solda); });
+  // solda de campo em C (lado da alma)
+  const bw = latAl-.005;
+  c=P(-.119,bw,zc); box(c[0],c[1],c[2], .006,.006,.22, th, M.solda);
+  [zc+.113, zc-.113].forEach(z=>{ c=P(-.086,bw,z); box(c[0],c[1],c[2], .06,.006,.006, th, M.solda); });
+  // barras roscadas, arruelas e porcas
+  rods.forEach(zz=>{
+    const z=-zz;
+    const a0=P(-.016-.033,latRod,z), a1=P(prof+.016+.033,latRod,z);
+    cyl(V(...a0),V(...a1), .0095, 12, M.barra);
+    [[-.016,-1],[prof+.016,1]].forEach(([s,sg])=>{
+      const w0=P(s,latRod,z), w1=P(s+sg*.004,latRod,z); cyl(V(...w0),V(...w1),.020,20,M.barra);
+      const n0=P(s+sg*.004,latRod,z), n1=P(s+sg*.023,latRod,z); cyl(V(...n0),V(...n1),.017,6,M.barra);
+    });
+  });
+  return P(-.056,0,0); // ponta da viga (folga de 40 mm)
+}
+
+// ---------- montagem do modelo (nós do CYPE nos centros dos pilares) ----------
+const Z0=-3.0, ZT=.15;
+const s76 = .0151; // pilar deslocado para a aleta cair na alma
+pilar('P76', -s76, 0, .20,.45, Z0,ZT);                 // face de 20 voltada para +Y
+pilar('P72', s76, 2.82, .20,.45, Z0,ZT);             // face de 20 voltada para -Y; face de 45 voltada para +X
+pilar('P80', 5.58, .652-s76, .45,.20, Z0,ZT+.25);           // face de 20 voltada para -X (continua para cima)
+pilar('PNOVO', 0.78+s76, 3.791, .45,.20, Z0,ZT);         // face de 45 voltada para -Y
+// sapata do PNOVO na rocha (esquemática)
+box(0.78+s76,3.791,Z0-.2, .9,.9,.4, 0, M.concreto, groups.concreto);
+label('Sapata na rocha (a dimensionar)',0.78,3.791,Z0-.45,'small');
+
+// W360x32,9: P76 -> P72
+const e76 = ligacao([0,.225],[0,-1],.45,W['W360x32,9'],[.06,.18,.30,.42]);
+const e72a= ligacao([0,2.82-.225],[0,1],.45,W['W360x32,9'],[.06,.18,.30,.42]);
+beam([e76[0],e76[1]],[e72a[0],e72a[1]],W['W360x32,9']);
+label('W360x32,9',0,2.2,.08,'small');
+
+// V1 W360x57,8: nó N59 (0,652 m do eixo do P76) -> P80 (recorte 25x75 nas duas mesas no início)
+const g = W['W360x32,9'], b8=W['W360x57,8'], YV1=.652;
+const e80 = ligacao([5.58-.225,YV1],[1,0],.45,b8,[.06,.18,.30,.42]);
+beam([g.tw/2+.015,YV1],[e80[0],e80[1]],b8,{s:{len:.075,top:.025,bot:.025}});
+label('V1 W360x57,8',3.2,YV1,.08,'small');
+// EN1 na V2 (16 mm), lado +Y
+(function(){
+  const y=YV1+b8.tw/2+.008;
+  box(.0029+(.060-.0029)/2, y, -g.d/2, .060-.0029,.016,g.d-2*g.tf, 0, M.chapa);
+  box(.0675, y, -b8.d/2, .015,.016,.22, 0, M.chapa);
+  box(.078, y-.004, -b8.d/2, .006,.006,.22, 0, M.solda);
+  [-b8.d/2+.113,-b8.d/2-.113].forEach(z=>box(.045,y-.004,z,.06,.006,.006,0,M.solda));
+})();
+
+// V3 e V4 W310x28,3: soldadas na alma da V1 (N61) com continuidade de momento
+const w3=W['W310x28,3'];
+pilar('P77', 0.78-s76, -0.698, .45,.20, Z0,ZT+.25);
+const e77 = ligacao([0.78,-0.698+.10],[0,-1],.20,w3,[.06,.18,.30,.42]);
+beam([0.78,YV1-b8.tw/2],[e77[0],e77[1]],w3,{s:{len:.10,top:.03,bot:0}});
+const eN = ligacao([0.78,3.791-.10],[0,1],.20,w3,[.06,.18,.30,.42]);
+beam([0.78,YV1+b8.tw/2],[eN[0],eN[1]],w3,{s:{len:.10,top:.03,bot:0}});
+label('V4 W310x28,3',0.95,2.3,.08,'small'); label('V3 W310x28,3',0.95,-.25,.08,'small');
+// tala TL1 sobre a mesa superior da V1 e soldas de campo do nó N61
+box(0.78,YV1,.00625, .45,.09,.0125, Math.PI/2, M.chapa);
+[-1,1].forEach(s=>{
+  box(0.78+.047,YV1+s*.165,.014,.006,.12,.006,0,M.solda); box(0.78-.047,YV1+s*.165,.014,.006,.12,.006,0,M.solda);
+  box(0.78+.006,YV1+s*(b8.tw/2+.003),-.165,.006,.006,.27,0,M.solda); box(0.78-.006,YV1+s*(b8.tw/2+.003),-.165,.006,.006,.27,0,M.solda);
+  box(0.78,YV1+s*(b8.tw/2+.003),-w3.d+w3.tf+.003,.102,.006,.006,0,M.solda); box(0.78,YV1+s*(b8.tw/2+.003),-w3.d-.003,.102,.006,.006,0,M.solda);
+});
+label('N61: continuidade V3–V4 (tala TL1)',0.78,YV1,.35,'small');
+
+// P75 retirado (indicado em transparência)
+box(0.78,YV1,(Z0-.36)/2, .20,.45,Math.abs(Z0+.36), 0, M.fantasma, groups.concreto);
+label('P75 (retirado)',0.78,YV1,.45,'small');
+
+// ---------- vistas ----------
+const views = {
+  'visao-geral': {t:[2.5,1.9,-.9], c:[8.0,-3.6,2.9],
+    i:'<strong>Visão geral.</strong> Reações características do CYPE: P76 46,2 kN, P77 16,2 kN, P72 13,9 kN, P80 9,8 kN, PNOVO 7,0 kN (total 93 kN).'},
+  'p76': {t:[-.02,.26,-.26], c:[.88,1.08,-.98],
+    i:'<strong>P76</strong> (20×45), face de 20 cm. Chapa 180×480×16, 4 barras Ø19 passantes de 550 mm, aleta deslocada 41 mm das barras, folga de 40 mm até a viga.'},
+  'p72': {t:[.05,2.66,-.24], c:[1.05,1.91,.45],
+    i:'<strong>P72</strong> (20×45), face de 20 cm, V2 W360x32,9. Recebe 13,9 kN. A ligação da W310 ao P72 foi eliminada (esforço nulo).'},
+  'p80': {t:[5.3,.652,-.24], c:[4.65,1.5,.45],
+    i:'<strong>P80</strong> (20×45), face de 20 cm, W360x57,8. Reação pequena (9,8 kN); mesma chapa-tipo com 4 barras.'},
+  'pnovo': {t:[.78,3.65,-.24], c:[.12,3.0,.38],
+    i:'<strong>PNOVO</strong> (20×45), face de 45 cm, W310x28,3. Recebe 7,0 kN. Barras de 300 mm em tubos de PVC deixados na fôrma.'},
+  'p77': {t:[.78,-.53,-.22], c:[1.42,.05,.3],
+    i:'<strong>P77</strong> (20×45, contínuo para cima), face de 45 cm, W310x28,3. Recebe 16,2 kN. Barras de 300 mm a ≥ 60 mm da Ø10 intermediária; reprocessar no Eberick.'},
+  'viga-viga': {t:[.4,.66,-.18], c:[1.25,1.75,.4],
+    i:'<strong>Nós viga–viga.</strong> N59: V1 apoiada no EN1 da V2 (articulada, recortes 25×75). N61: V3 e V4 encostadas e soldadas na alma da V1, com tala TL1 sobre a mesa (continuidade de momento).'}
+};
+const info=document.getElementById('info');
+const btns=[...document.querySelectorAll('.views button')];
+let anim=null;
+const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+function goView(k, instant){
+  const v=views[k]||views['visao-geral']; k=views[k]?k:'visao-geral';
+  btns.forEach(b=>b.setAttribute('aria-pressed', String(b.dataset.view===k)));
+  info.innerHTML=v.i;
+  const tT=V(...v.t), cT=V(...v.c);
+  if(instant||reduce){ controls.target.copy(tT); camera.position.copy(cT); controls.update(); return; }
+  const t0=controls.target.clone(), c0=camera.position.clone(), st=performance.now();
+  anim=(now)=>{ let a=Math.min(1,(now-st)/700); a=a<.5?2*a*a:1-Math.pow(-2*a+2,2)/2;
+    controls.target.lerpVectors(t0,tT,a); camera.position.lerpVectors(c0,cT,a); if(a>=1) anim=null; };
+}
+btns.forEach(b=>b.addEventListener('click',()=>{ if(location.hash!=='#'+b.dataset.view) location.hash=b.dataset.view; else goView(b.dataset.view); }));
+window.addEventListener('hashchange',()=>goView(location.hash.slice(1)));
+
+// ---------- controles ----------
+document.getElementById('t-transp').addEventListener('change',e=>{ M.concreto.opacity=e.target.checked?.32:1; M.concreto.depthWrite=!e.target.checked; M.concreto.transparent=e.target.checked; M.concreto.needsUpdate=true; });
+document.getElementById('t-arm').addEventListener('change',e=>{ groups.arm.visible=e.target.checked; });
+document.getElementById('t-lbl').addEventListener('change',e=>{ groups.lbl.visible=e.target.checked; labelR.domElement.style.display=e.target.checked?'':'none'; });
+const panel=document.getElementById('panel'), tp=document.getElementById('toggle-panel');
+tp.addEventListener('click',()=>{ const m=panel.classList.toggle('min'); tp.textContent=m?'Mostrar':'Ocultar'; tp.setAttribute('aria-expanded',String(!m)); });
+
+// ---------- tema ----------
+function applyTheme(){
+  scene.background=new THREE.Color(css('--scene-bg'));
+  const map={concreto:'--c-concreto',perfil:'--c-perfil',chapa:'--c-chapa',barra:'--c-barra',solda:'--c-solda',arm:'--c-arm'};
+  Object.entries(map).forEach(([k,v])=>{ M[k].color.set(css(v)); if(k==='solda') M[k].emissive.set(css(v)); });
+  M.fantasma.color.set(css('--c-chapa')); M.seta.color.set(css('--c-chapa'));
+}
+applyTheme();
+window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change',applyTheme);
+new MutationObserver(applyTheme).observe(document.documentElement,{attributes:true,attributeFilter:['data-theme']});
+
+// ---------- loop ----------
+function resize(){ const w=stage.clientWidth, h=stage.clientHeight; renderer.setSize(w,h); labelR.setSize(w,h); camera.aspect=w/h;
+  if(w>900){ const off=Math.round(document.getElementById('panel').offsetWidth+24); camera.setViewOffset(w+off,h,0,0,w,h); } else camera.clearViewOffset();
+  camera.updateProjectionMatrix(); }
+window.addEventListener('resize',resize); resize();
+goView(location.hash.slice(1), true);
+renderer.setAnimationLoop(now=>{ if(anim) anim(now); controls.update(); renderer.render(scene,camera); labelR.render(scene,camera); });
+})();
+</script>
+</body>
+</html>
